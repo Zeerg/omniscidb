@@ -21,6 +21,9 @@ import org.apache.thrift.transport.TTransport;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
@@ -316,7 +319,7 @@ public class SockTransportProperties {
     if (transportType == TransportType.encryptedServer) {
       return openServerTransportEncrypted(port);
     } else if (transportType == TransportType.unencryptedServer) {
-      return (new TServerSocket(port));
+      return new TServerSocket(new InetSocketAddress(serverBindAddress(), port));
     } else {
       String errStr = new String("Invalid transportType [" + transportType
               + "] used in openServerTransport");
@@ -339,8 +342,20 @@ public class SockTransportProperties {
     // return TSSLTransportFactory.getClientSocket(server_host, port,
     // socket_so_timeout_ms, params);
     TServerTransport t = TSSLTransportFactory.getServerSocket(
-            port, socket_so_timeout_ms, null, params);
+            port, socket_so_timeout_ms, serverBindAddress(), params);
     return t;
+  }
+
+  private InetAddress serverBindAddress() throws org.apache.thrift.TException {
+    String address = System.getProperty("heavyai.listen.address");
+    if (address == null || address.isEmpty()) {
+      return null;
+    }
+    try {
+      return InetAddress.getByName(address);
+    } catch (UnknownHostException error) {
+      throw new org.apache.thrift.TException("Invalid server listen address", error);
+    }
   }
 
   private TrustManager[] trustManagers;

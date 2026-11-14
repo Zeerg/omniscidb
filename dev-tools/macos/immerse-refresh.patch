@@ -1,0 +1,278 @@
+diff --git a/src/actions/dc-action-creators.js b/src/actions/dc-action-creators.js
+index dded0ed..242db8a 100644
+--- a/src/actions/dc-action-creators.js
++++ b/src/actions/dc-action-creators.js
+@@ -140,6 +140,7 @@ export const redrawAll = (group, all, excludeDcChart) => (
+       return dispatch(action(REDRAW_ALL_SUCCESS, { dashboardId, tabId, group }))
+     })
+     .catch((error) => {
++      dispatch(action(REDRAW_ALL_ERROR, { error, dashboardId, tabId }))
+       dispatch(setAppError(REDRAW_ALL_ERROR, error))
+     })
+ }
+diff --git a/src/actions/dc-action-creators.unit.test.js b/src/actions/dc-action-creators.unit.test.js
+index 703cb8b..f36a5b3 100644
+--- a/src/actions/dc-action-creators.unit.test.js
++++ b/src/actions/dc-action-creators.unit.test.js
+@@ -3,20 +3,28 @@
+ 
+ import configureStore from "redux-mock-store"
+ import thunk from "redux-thunk"
++import { asEffect } from "redux-saga/utils"
+ import {
+   chartRenderSuccess,
+-  handleAllChartsRendered
++  handleAllChartsRendered,
++  redrawAll
+ } from "actions/dc-action-creators"
+ import {
+   CHART_RENDER_SUCCESS,
+   INITIAL_RENDER_DONE,
++  REDRAW_ALL_ERROR,
++  REDRAW_ALL_REQUEST,
+   RENDER_ALL_SUCCESS
+ } from "constants/action-types"
++import dcReducer from "reducers/dc-reducer"
++import { refreshDashboardData } from "sagas/data-refresh-sagas"
++import { SET_CHART_DATA_ERROR } from "actions/chart-error-state-action-creators"
+ 
+ const mockServices = new Map()
+ const mockDc = {
+   resetRedrawStack: () => {},
+-  renderAllAsync: () => Promise.resolve()
++  renderAllAsync: () => Promise.resolve(),
++  redrawAllAsync: jest.fn()
+ }
+ mockServices.set("dc", mockDc)
+ 
+@@ -42,6 +50,66 @@ const state = {
+ }
+ 
+ describe("DC action creators", () => {
++  describe("dashboard refresh", () => {
++    it("clears query errors without clearing selector validation errors", () => {
++      const charts = {
++        1: {},
++        2: { hasError: true },
++        3: { dataError: "Query failed" }
++      }
++      const refresh = refreshDashboardData()
++      refresh.next()
++      refresh.next({
++        charts,
++        dashboard: { id: 1, selectedTabId: "1", streaming: { request: false } },
++        dc: { initialRender: { done: true }, redrawAll: { pending: false } }
++      })
++
++      const retry = asEffect.put(refresh.next().value)
++      expect(retry).toBeDefined()
++      const dispatch = jest.fn()
++      retry.action(dispatch, () => ({ charts }))
++      expect(dispatch).toHaveBeenCalledWith({
++        type: SET_CHART_DATA_ERROR,
++        chartId: "3",
++        error: undefined
++      })
++    })
++  })
++
++  describe("redrawAll", () => {
++    it("clears the pending state after failure and permits a successful retry", async () => {
++      const error = new Error("Query failed")
++      mockDc.redrawAllAsync
++        .mockRejectedValueOnce(error)
++        .mockResolvedValueOnce([])
++      const store = mockStore(state)
++
++      await store.dispatch(redrawAll(null, true))
++
++      const actions = store.getActions()
++      expect(actions[0].type).toBe(REDRAW_ALL_REQUEST)
++      expect(actions[1]).toEqual({
++        type: REDRAW_ALL_ERROR,
++        error,
++        dashboardId: 1,
++        tabId: "1"
++      })
++      const failed = actions.reduce(dcReducer, undefined)
++      expect(failed.redrawAll.pending).toBe(false)
++      expect(failed.redrawAll.error).toBe(error)
++
++      await store.dispatch(redrawAll(null, true))
++
++      const recovered = store.getActions().reduce(dcReducer, undefined)
++      expect(recovered.redrawAll).toEqual({
++        done: true,
++        pending: false,
++        error: false
++      })
++    })
++  })
++
+   describe("handleAllChartsRendered", () => {
+     describe("when initial render is not done and counter equals num charts", () => {
+       it("should dispatch RENDER_ALL_SUCCESS and INITIAL_RENDER_DONE", () => {
+diff --git a/src/components/custom-colors/custom-colors-list-item.js b/src/components/custom-colors/custom-colors-list-item.js
+index ec8f02d..b96b308 100644
+--- a/src/components/custom-colors/custom-colors-list-item.js
++++ b/src/components/custom-colors/custom-colors-list-item.js
+@@ -76,13 +76,12 @@ export class CustomColorsListItem extends Component {
+   }
+ 
+   componentDidMount() {
+-    if (this.props.type === "add") {
++    if (this.props.type === "add" && this.props.columnName) {
+       this.setCardinality()
+     }
+   }
+ 
+   async setCardinality() {
+-    // TODO[C]: need to safeguard this query, this.props.columnname is undefined for d3
+     this.setState({ loading: true })
+     const cardinalityQuery = process(
+       `SELECT APPROX_COUNT_DISTINCT(${this.props.columnName}) AS num FROM ${this.props.table}`,
+diff --git a/src/components/custom-colors/custom-colors-list-item.unit.test.js b/src/components/custom-colors/custom-colors-list-item.unit.test.js
+index b81679a..feb783b 100644
+--- a/src/components/custom-colors/custom-colors-list-item.unit.test.js
++++ b/src/components/custom-colors/custom-colors-list-item.unit.test.js
+@@ -29,6 +29,39 @@ describe("CustomColorsListItem Component", () => {
+     jest.clearAllMocks()
+   })
+ 
++  describe("color dimension cardinality", () => {
++    afterEach(() => {
++      jest.restoreAllMocks()
++    })
++
++    it.each([undefined, null, ""])(
++      "does not query cardinality for a missing column (%s)",
++      (columnName) => {
++        const setCardinality = jest
++          .spyOn(CustomColorsListItem.prototype, "setCardinality")
++          .mockResolvedValue(undefined)
++
++        render(
++          <CustomColorsListItem {...props} type="add" columnName={columnName} />
++        )
++
++        expect(setCardinality).not.toHaveBeenCalled()
++      }
++    )
++
++    it("queries cardinality when the add row has a column", () => {
++      const setCardinality = jest
++        .spyOn(CustomColorsListItem.prototype, "setCardinality")
++        .mockResolvedValue(undefined)
++
++      render(
++        <CustomColorsListItem {...props} type="add" columnName="primary_cwe" />
++      )
++
++      expect(setCardinality).toHaveBeenCalledTimes(1)
++    })
++  })
++
+   it("should be initialized with popup hidden", () => {
+     render(<CustomColorsListItem {...props} />)
+     expect(screen.getByTestId("custom-swatch")).toBeInTheDocument()
+diff --git a/src/sagas/data-refresh-sagas.js b/src/sagas/data-refresh-sagas.js
+index b2ba5a9..53a60e6 100644
+--- a/src/sagas/data-refresh-sagas.js
++++ b/src/sagas/data-refresh-sagas.js
+@@ -3,6 +3,7 @@
+ 
+ import * as DashboardActions from "actions/dashboard-action-creators"
+ import * as DCActions from "actions/dc-action-creators"
++import { clearChartDataError } from "actions/chart-error-state-action-creators"
+ import { updateDashboardSaveState } from "actions/dashboard-save-state-action-creators"
+ 
+ import { all, call, put, select, take, takeEvery } from "redux-saga/effects"
+@@ -46,6 +47,7 @@ export function* handleSetStreamingInterval(action) {
+ // differently (see PR #7157)
+ export function* refreshDashboardData() {
+   const {
++    charts,
+     dashboard: { streaming, id, selectedTabId },
+     dc: { redrawAll, initialRender }
+   } = yield select((s) => s)
+@@ -53,6 +55,12 @@ export function* refreshDashboardData() {
+   if (!(streaming.request || redrawAll.pending) && initialRender.done) {
+     yield put(DashboardActions.refreshDashboardRequest())
+ 
++    for (const chartId of Object.keys(charts)) {
++      if (charts[chartId].dataError) {
++        yield put(clearChartDataError(chartId))
++      }
++    }
++
+     yield* refreshBinnedData({ dashboardId: id, tabId: selectedTabId })
+ 
+     const dc = Services.get("dc")
+diff --git a/src/services/ImmerseCrossFilter/ImmerseCrossFilterGroup.js b/src/services/ImmerseCrossFilter/ImmerseCrossFilterGroup.js
+index 5dc7671..cc491c2 100644
+--- a/src/services/ImmerseCrossFilter/ImmerseCrossFilterGroup.js
++++ b/src/services/ImmerseCrossFilter/ImmerseCrossFilterGroup.js
+@@ -279,7 +279,12 @@ export default function getGroup({ newCrossFilter, newDimension, dimArray }) {
+       renderSpec,
+       ignoreFilters,
+       sortOrder = "DESC",
+-      callback = (_, res) => res,
++      callback = (error, res) => {
++        if (error) {
++          throw error
++        }
++        return res
++      },
+       orderByClause
+     ) => {
+       // k is the limit on the query
+diff --git a/src/services/ImmerseCrossFilter/ImmerseCrossFilterGroup.unit.test.js b/src/services/ImmerseCrossFilter/ImmerseCrossFilterGroup.unit.test.js
+index 333112d..dd2e329 100644
+--- a/src/services/ImmerseCrossFilter/ImmerseCrossFilterGroup.unit.test.js
++++ b/src/services/ImmerseCrossFilter/ImmerseCrossFilterGroup.unit.test.js
+@@ -24,6 +24,45 @@ function resetStore() {
+ }
+ 
+ describe("ImmerseCrossFilterGroup test suite", () => {
++  describe("query failures", () => {
++    beforeEach(() => {
++      setStore(mockStore(filterState))
++    })
++
++    afterEach(() => {
++      jest.restoreAllMocks()
++      resetStore()
++    })
++
++    it.each(["topAsync", "bottomAsync", "allAsync"])(
++      "%s rejects with the original error, including empty backend messages",
++      async (method) => {
++        const group = await getTestGroup(col)
++        const queryAsync = jest.spyOn(group.getCrossfilter(), "queryAsync")
++
++        for (const error of [
++          new Error("Query failed"),
++          { name: "TDBException", error_msg: "" }
++        ]) {
++          queryAsync.mockRejectedValue(error)
++          await expect(group[method]()).rejects.toBe(error)
++        }
++      }
++    )
++
++    it("passes query errors to explicit callbacks once", async () => {
++      const group = await getTestGroup(col)
++      const error = new Error("Query failed")
++      const callback = jest.fn()
++      jest.spyOn(group.getCrossfilter(), "queryAsync").mockRejectedValue(error)
++
++      await group.allAsync(callback)
++
++      expect(callback).toHaveBeenCalledTimes(1)
++      expect(callback).toHaveBeenCalledWith(error)
++    })
++  })
++
+   it("creates a group", async () => {
+     const store = mockStore(filterState)
+     setStore(store)

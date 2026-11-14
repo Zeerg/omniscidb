@@ -220,7 +220,7 @@ import_export::SourceType GDAL::getDataSourceType(const std::string& name) {
   return source_type;
 }
 
-std::vector<std::string> GDAL::unpackMetadata(char** metadata) {
+std::vector<std::string> GDAL::unpackMetadata(const char* const* metadata) {
   CHECK(initialized_) << "GDAL not initialized!";
   std::vector<std::string> strings;
   if (metadata) {
@@ -251,7 +251,7 @@ void GDAL::logMetadata(GDALMajorObject* object) {
   }
 }
 
-std::string GDAL::getMetadataString(char** metadata, const std::string& key) {
+std::string GDAL::getMetadataString(const char* const* metadata, const std::string& key) {
   CHECK(initialized_) << "GDAL not initialized!";
   auto const key_len = key.length();
   auto const strings = unpackMetadata(metadata);

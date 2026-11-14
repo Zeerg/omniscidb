@@ -7,7 +7,11 @@
 
 #include <algorithm>
 #include <boost/filesystem.hpp>
+#ifdef HAVE_BOOST_1_86
+#include <boost/process/v1.hpp>
+#else
 #include <boost/process.hpp>
+#endif
 #include <boost/range/combine.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -83,7 +87,11 @@ inline std::string run(const std::string& cmd,
   std::error_code ec;
   std::string output, errors;
   const auto time_ms = measure<>::execution([&]() {
+#ifdef HAVE_BOOST_1_86
+    using namespace boost::process::v1;
+#else
     using namespace boost::process;
+#endif
     ipstream stdout, stderr;
     if (!chdir.empty()) {
       rcode = system(cmd, std_out > stdout, std_err > stderr, ec, start_dir = chdir);

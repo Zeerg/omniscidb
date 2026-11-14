@@ -40,6 +40,24 @@ endif()
 
 project(heavyai)
 
+if(APPLE)
+  add_compile_definitions(BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
+  execute_process(COMMAND xcrun --show-sdk-path
+    OUTPUT_VARIABLE MACOS_SDK_PATH OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
+  set(CLANG_SDK_INC -isysroot "${MACOS_SDK_PATH}")
+endif()
+
+option(ENABLE_METAL "Enable native Metal query execution on macOS" ${APPLE})
+if(ENABLE_METAL)
+  if(NOT APPLE)
+    message(FATAL_ERROR "ENABLE_METAL requires macOS")
+  endif()
+  enable_language(OBJCXX)
+  set(CMAKE_OBJCXX_STANDARD 17)
+  add_compile_definitions(HAVE_METAL)
+endif()
+
 # ENABLE_IWYU: Generates .iwyu files suitable for input into include-what-you-use's fix_includes.py tool.
 option(ENABLE_IWYU "Enable include-what-you-use advice (.iwyu files for fix_includes.py)" OFF)
 if(ENABLE_IWYU)
@@ -669,7 +687,12 @@ find_library(ICUI18N_LIBRARY icui18n REQUIRED)
 set(ICU_LIBRARIES ${ICUUC_LIBRARY} ${ICUDATA_LIBRARY} ${ICUI18N_LIBRARY})
 
 # Boost
-find_package(Boost COMPONENTS log log_setup filesystem program_options regex system thread timer locale iostreams serialization REQUIRED)
+find_package(Boost REQUIRED)
+set(BOOST_SYSTEM_COMPONENT "")
+if(Boost_VERSION LESS 108900)
+  set(BOOST_SYSTEM_COMPONENT system)
+endif()
+find_package(Boost COMPONENTS log log_setup filesystem program_options regex ${BOOST_SYSTEM_COMPONENT} thread timer locale iostreams serialization REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 list(APPEND Boost_LIBRARIES ${ICU_LIBRARIES})
 if(Boost_VERSION GREATER_EQUAL 108600)
@@ -713,7 +736,7 @@ endif()
 find_package(Arrow REQUIRED)
 add_definitions("-DARROW_NO_DEPRECATED_API")
 add_definitions("-DENABLE_ARROW_4")
-include_directories(${Arrow_INCLUDE_DIRS})
+include_directories(BEFORE ${Arrow_INCLUDE_DIRS})
 
 option(ENABLE_IMPORT_PARQUET "Enable Parquet Importer support" ON)
 if(ENABLE_IMPORT_PARQUET)
@@ -1234,7 +1257,7 @@ set (UTILITY_JAR "heavyai-utility-${OMNISCI_JAR_RELEASE_VERSION}.jar")
 
 set(MVN_PATH_COMMAND "MVNPATH=${CMAKE_SOURCE_DIR}/java")
 
-set(THRIFT_MVN_VERSION "0.24.0") # independent of Thrift C++ version
+set(THRIFT_MVN_VERSION "0.24.0" CACHE STRING "Java Thrift runtime version")
 add_custom_command(
   OUTPUT
     ${CMAKE_BINARY_DIR}/bin/${UTILITY_JAR}

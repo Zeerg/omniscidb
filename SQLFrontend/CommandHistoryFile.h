@@ -6,6 +6,7 @@
 #ifndef COMMANDHISTORYFILE_H
 #define COMMANDHISTORYFILE_H
 
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -33,15 +34,19 @@ class DefaultEnvResolver {
   }
 
   auto const* getenv(char const* env_var_name) const {
+#ifdef __APPLE__
+    return ::issetugid() ? nullptr : std::getenv(env_var_name);
+#else
     return ::secure_getenv(env_var_name);
+#endif
   }
 };
 
 std::string getHomeDirectory() {
-  if (auto const* home = ::secure_getenv("HOME")) {
+  DefaultEnvResolver r;
+  if (auto const* home = r.getenv("HOME")) {
     return home;
   }
-  DefaultEnvResolver r;
   return r.getpwdir(r.getuid());
 }
 

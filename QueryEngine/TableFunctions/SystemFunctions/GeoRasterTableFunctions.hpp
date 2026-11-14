@@ -586,7 +586,7 @@ void GeoRaster<T, Z>::computeParallelImpl(const Column<T2>& input_x,
       std::min(max_thread_count,
                ((input_size + max_inputs_per_thread - 1) / max_inputs_per_thread));
   const size_t num_threads_by_output_size =
-      std::min(max_thread_count, ((max_temp_output_entries + num_bins_ - 1) / num_bins_));
+      std::min<size_t>(max_thread_count, ((max_temp_output_entries + num_bins_ - 1) / num_bins_));
   const size_t num_threads =
       std::min(num_threads_by_input_elements, num_threads_by_output_size);
   if (num_threads <= 1) {

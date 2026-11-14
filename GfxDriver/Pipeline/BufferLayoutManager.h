@@ -86,7 +86,7 @@ class BufferLayoutManager {
           boost::multi_index::ordered_unique<
               boost::multi_index::tag<BufferLayoutOffsetTag>,
               boost::multi_index::
-                  member<BoundLayoutData, size_t, &BoundLayoutData::offset_bytes>>,
+                  member<BoundLayoutData, uint64_t, &BoundLayoutData::offset_bytes>>,
           boost::multi_index::hashed_unique<
               boost::multi_index::tag<BufferLayoutTag>,
               boost::multi_index::

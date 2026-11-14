@@ -25,6 +25,12 @@ build/
 build_debug/
 build_release/
 build3.6/
+build-macos/
+build-metal-runtime/
+webserver-src/
+immerse-src/
+charting-src/
+dev-tools/macos/servers.local.json
 !docker/build/
 
 # history files
@@ -52,6 +58,7 @@ gen-js/
 gen-py/
 java/target/
 java/**/log/
+java/**/log4j.log
 
 # sphinx docs
 !docs/**/Makefile

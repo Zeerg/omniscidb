@@ -21,6 +21,9 @@ using namespace std::string_literals;
 #include "MapDRelease.h"
 #include "MigrationMgr/MigrationMgr.h"
 #include "QueryEngine/GroupByAndAggregate.h"
+#ifdef HAVE_METAL
+#include "QueryEngine/Metal/MetalExecutor.h"
+#endif
 #include "QueryEngine/JoinHashTable/BaselineJoinHashTable.h"
 #include "QueryEngine/JoinHashTable/BoundingBoxIntersectJoinHashTable.h"
 #include "QueryEngine/JoinHashTable/PerfectJoinHashTable.h"
@@ -542,6 +545,9 @@ void CommandLineOptions::fillOptions() {
   desc.add_options()("http-port",
                      po::value<int>(&http_port)->default_value(http_port),
                      "HTTP port number.");
+  desc.add_options()("listen-address",
+                     po::value<std::string>(&listen_address)->default_value(""),
+                     "Bind database sockets to this address. Empty means all interfaces.");
   desc.add_options()("http-binary-port",
                      po::value<int>(&http_binary_port)->default_value(http_binary_port),
                      "HTTP binary port number.");
@@ -1169,6 +1175,14 @@ void CommandLineOptions::fillDeveloperOptions() {
           ->default_value(intel_jit_profile)
           ->implicit_value(true),
       "Enable runtime support for the JIT code profiling using Intel VTune.");
+#ifdef HAVE_METAL
+  desc.add_options()("enable-metal",
+                     po::value<bool>(&g_enable_metal)
+                         ->default_value(g_enable_metal)
+                         ->implicit_value(true),
+                     "Execute supported integer aggregate queries on Metal. "
+                     "Log and use the CPU executor for unsupported queries.");
+#endif
   desc.add_options()(
       "enable-cpu-sub-tasks",
       po::value<bool>(&g_enable_cpu_sub_tasks)

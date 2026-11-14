@@ -1,0 +1,217 @@
+diff --git a/src/charts/line/line-chart-sagas.js b/src/charts/line/line-chart-sagas.js
+index c9c1b90..ca35fab 100644
+--- a/src/charts/line/line-chart-sagas.js
++++ b/src/charts/line/line-chart-sagas.js
+@@ -74,6 +74,9 @@ export function* updateChartColors(chart, id, dcChart) {
+ }
+ 
+ export function* createAndRenderLineChart({ id, chartSpec }) {
++  const { id: dashboardId, selectedTabId: tabId } = yield select(
++    ({ dashboard }) => dashboard
++  )
+   const node = yield call([document, "getElementById"], `chart${id}`)
+   const rangeNode = yield call([document, "getElementById"], `chart${id}-range`)
+ 
+@@ -109,7 +112,7 @@ export function* createAndRenderLineChart({ id, chartSpec }) {
+     }
+     yield put(updateChart(id, { loading: false }))
+ 
+-    yield put(DCActions.chartRenderSuccess(id))
++    yield put(DCActions.chartRenderSuccess(id, dashboardId, tabId))
+   } catch (e) {
+     yield put(updateChart(id, { loading: false }))
+     yield put(DCActions.chartRenderError(e, id))
+diff --git a/src/charts/utils/event-listeners.js b/src/charts/utils/event-listeners.js
+index 9d5bac5..be8e61f 100644
+--- a/src/charts/utils/event-listeners.js
++++ b/src/charts/utils/event-listeners.js
+@@ -256,6 +256,9 @@ export function createD3CustomDomainRangeUpdateListener(events) {
+       dcChart.on(event, () => {
+         const state = store.getState()
+         const chart = state.charts[id]
++        if (!chart) {
++          return
++        }
+         const dimension = chart?.dimensions[0]
+ 
+         // set up chart.color object for palette mappings if we have a d3 chart
+diff --git a/src/charts/utils/event-listeners.unit.test.js b/src/charts/utils/event-listeners.unit.test.js
+index 32c9924..054c09d 100644
+--- a/src/charts/utils/event-listeners.unit.test.js
++++ b/src/charts/utils/event-listeners.unit.test.js
+@@ -9,9 +9,15 @@ import {
+   createLabelUpdateFunction,
+   createAxisDomainUpdateFunction,
+   elasticXListener,
+-  elasticYListener
++  elasticYListener,
++  createD3CustomDomainRangeUpdateListener
+ } from "./event-listeners"
+ import { setElasticY } from "actions/charts-action-creators"
++import {
++  populateImportableStore,
++  saveStore,
++  resetStore
++} from "store/importableStore"
+ 
+ import { updateColorLegend } from "../raster-chart/raster-chart-actions"
+ 
+@@ -19,6 +25,25 @@ describe("Chart Event Listeners", () => {
+   let dispatch = null
+   let dcChart = null
+   const id = 0
++  it("ignores a late redraw after navigation removes the chart", () => {
++    saveStore()
++    populateImportableStore({ getState: () => ({ charts: {} }) })
++    const onDispatch = jest.fn()
++    try {
++      const listener = createD3CustomDomainRangeUpdateListener(["postRedraw"])
++      expect(() =>
++        listener(
++          { id, dispatch: onDispatch },
++          {
++            on: (event, callback) => callback()
++          }
++        )
++      ).not.toThrow()
++      expect(onDispatch).not.toHaveBeenCalled()
++    } finally {
++      resetStore()
++    }
++  })
+   describe("Filtered Event Listener", () => {
+     /*
+     beforeEach(() => {
+diff --git a/src/components/chart-axis-overlay/styles.scss b/src/components/chart-axis-overlay/styles.scss
+index ba92c06..5decec5 100644
+--- a/src/components/chart-axis-overlay/styles.scss
++++ b/src/components/chart-axis-overlay/styles.scss
+@@ -16,6 +16,7 @@
+   }
+ }
+ 
++.chart-type-line,
+ .chart-type-scatter,
+ .chart-type-backendScatter,
+ .chart-type-heat,
+diff --git a/src/charts/line/line.unit.test.js b/src/charts/line/line.unit.test.js
+new file mode 100644
+index 0000000..bfec822
+--- /dev/null
++++ b/src/charts/line/line.unit.test.js
+@@ -0,0 +1,115 @@
++// SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++// SPDX-License-Identifier: Apache-2.0
++
++import binningMixin from "@heavyai/charting/src/mixins/binning-mixin"
++import dc from "services/dc"
++import d3 from "services/d3"
++import { runSaga } from "redux-saga"
++import * as DCActions from "actions/dc-action-creators"
++import * as Line from "./line"
++import { createAndRenderLineChart } from "./line-chart-sagas"
++
++const start = new Date("2020-01-01T00:00:00Z")
++const end = new Date("2020-04-01T00:00:00Z")
++
++afterEach(() => {
++  jest.restoreAllMocks()
++  dc.chartRegistry.clear()
++  document.body.innerHTML = ""
++})
++
++describe("unbinned line charts", () => {
++  it.each([null, undefined])(
++    "keeps a continuous date range when bin settings are %s",
++    (binParams) => {
++      const chart = {
++        on: jest.fn(),
++        group: () => ({ binParams: () => [binParams] })
++      }
++      binningMixin(chart)
++      const extent = [start, end]
++
++      // eslint-disable-next-line no-underscore-dangle
++      expect(chart._binBrushExtent(extent)).toBe(extent)
++    }
++  )
++
++  it("still snaps a binned date range to month boundaries", () => {
++    const chart = {
++      on: jest.fn(),
++      group: () => ({
++        binParams: () => [{ timeBin: "month", binBounds: [start, end] }]
++      }),
++      xAxisMax: () => NaN,
++      xAxisMin: () => NaN
++    }
++    binningMixin(chart)
++
++    expect(
++      // eslint-disable-next-line no-underscore-dangle
++      chart._binBrushExtent([
++        new Date("2020-01-04T00:00:00Z"),
++        new Date("2020-02-25T00:00:00Z")
++      ])
++    ).toEqual([start, new Date("2020-03-01T00:00:00Z")])
++  })
++
++  it("updates date controls without bin settings", () => {
++    document.body.innerHTML = `<div id="line-test"><div class="range-display">
++      <input class="range-start-day"><input class="range-start-time">
++      <input class="range-end-day"><input class="range-end-time">
++    </div></div>`
++    const chart = dc.lineChart("#line-test")
++    chart.group({ binParams: () => [null] })
++    chart.x(d3.time.scale.utc().domain([start, end]))
++
++    expect(() => chart.updateRangeInput()).not.toThrow()
++    expect(document.querySelector(".range-start-day").value).toBe(
++      "Jan 01, 2020"
++    )
++    expect(document.querySelector(".range-end-day").value).toBe("Apr 01, 2020")
++    expect(document.querySelector(".range-start-time").value).toBe("12:00AM")
++  })
++
++  it("does not update absent date controls on a numeric chart", () => {
++    document.body.innerHTML = '<div id="line-test"></div>'
++    const chart = dc.lineChart("#line-test")
++    chart.group({ binParams: () => [null] })
++    chart.x(d3.scale.linear().domain([0, 10]))
++
++    expect(() => chart.updateRangeInput()).not.toThrow()
++  })
++})
++
++describe("line render identifiers", () => {
++  it("keeps the starting dashboard context when navigation changes during rendering", async () => {
++    document.body.innerHTML =
++      '<div id="chart11"></div><div id="chart11-range"></div>'
++    const state = {
++      dashboard: { id: 3, selectedTabId: "original-tab" },
++      charts: {
++        11: { color: { customDomain: ["v1"] }, measures: [], dimensions: [] }
++      }
++    }
++    const chart = {
++      __dcFlag__: 17,
++      renderAsync: jest.fn(() => {
++        state.dashboard = { id: 4, selectedTabId: "next-tab" }
++        return Promise.resolve()
++      })
++    }
++    jest.spyOn(Line, "createLineChartAsync").mockResolvedValue(chart)
++    jest.spyOn(Line, "addLineChartEventListeners").mockImplementation(() => {})
++    const success = jest
++      .spyOn(DCActions, "chartRenderSuccess")
++      .mockReturnValue({ type: "TEST_RENDER_SUCCESS" })
++
++    await runSaga(
++      { getState: () => state, dispatch: jest.fn() },
++      createAndRenderLineChart,
++      { id: "11", chartSpec: { width: 900, height: 300 } }
++    ).done
++
++    expect(success).toHaveBeenCalledWith("11", 3, "original-tab")
++  })
++})

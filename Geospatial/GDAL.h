@@ -56,9 +56,9 @@ class GDAL {
                                         const import_export::SourceType source_type);
   static import_export::SourceType getDataSourceType(const std::string& name);
 
-  static std::vector<std::string> unpackMetadata(char** metadata);
+  static std::vector<std::string> unpackMetadata(const char* const* metadata);
   static void logMetadata(GDALMajorObject* object);
-  static std::string getMetadataString(char** metadata, const std::string& key);
+  static std::string getMetadataString(const char* const* metadata, const std::string& key);
 
  private:
   static bool initialized_;

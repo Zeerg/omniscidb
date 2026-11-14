@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 
-find_package(Boost COMPONENTS program_options filesystem regex system REQUIRED QUIET)
+find_package(Boost COMPONENTS program_options filesystem regex ${BOOST_SYSTEM_COMPONENT} REQUIRED QUIET)
 
 include_directories(${CMAKE_SOURCE_DIR}/ThirdParty/linenoise)
 

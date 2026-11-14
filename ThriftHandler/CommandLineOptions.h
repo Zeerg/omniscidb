@@ -39,6 +39,7 @@ class CommandLineOptions {
   }
   int http_port = 6278;
   int http_binary_port = 6276;
+  std::string listen_address;
   size_t reserved_gpu_mem = 768 * 1024 * 1024;  // doubled from 384MB 2/13/24
   std::string base_path;
   File_Namespace::DiskCacheConfig disk_cache_config;

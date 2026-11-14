@@ -24,7 +24,7 @@ NEVER_INLINE HOST std::pair<T, T> get_column_min_max(const Column<T>& col) {
   const int64_t num_rows = col.size();
   const size_t max_thread_count = std::thread::hardware_concurrency();
   const size_t max_inputs_per_thread = 20000;
-  const size_t num_threads = std::min(
+  const size_t num_threads = std::min<size_t>(
       max_thread_count, ((num_rows + max_inputs_per_thread - 1) / max_inputs_per_thread));
 
   std::vector<T> local_col_mins(num_threads, std::numeric_limits<T>::max());
@@ -106,7 +106,7 @@ NEVER_INLINE HOST double get_column_mean(const T* data, const int64_t num_rows) 
   // const int64_t num_rows = col.size();
   const size_t max_thread_count = std::thread::hardware_concurrency();
   const size_t max_inputs_per_thread = 20000;
-  const size_t num_threads = std::min(
+  const size_t num_threads = std::min<size_t>(
       max_thread_count, ((num_rows + max_inputs_per_thread - 1) / max_inputs_per_thread));
 
   std::vector<double> local_col_sums(num_threads, 0.);
@@ -201,7 +201,7 @@ NEVER_INLINE HOST double get_column_std_dev(const T* data,
   // const int64_t num_rows = col.size();
   const size_t max_thread_count = std::thread::hardware_concurrency();
   const size_t max_inputs_per_thread = 200000;
-  const size_t num_threads = std::min(
+  const size_t num_threads = std::min<size_t>(
       max_thread_count, ((num_rows + max_inputs_per_thread - 1) / max_inputs_per_thread));
 
   std::vector<double> local_col_squared_residuals(num_threads, 0.);
@@ -269,7 +269,7 @@ NEVER_INLINE HOST std::tuple<T, T, bool> get_column_metadata(const Column<T>& co
   const int64_t num_rows = col.size();
   const size_t max_thread_count = std::thread::hardware_concurrency();
   const size_t max_inputs_per_thread = 200000;
-  const size_t num_threads = std::min(
+  const size_t num_threads = std::min<size_t>(
       max_thread_count, ((num_rows + max_inputs_per_thread - 1) / max_inputs_per_thread));
 
   std::vector<T> local_col_mins(num_threads, std::numeric_limits<T>::max());

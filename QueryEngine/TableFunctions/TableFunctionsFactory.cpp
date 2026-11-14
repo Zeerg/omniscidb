@@ -391,6 +391,7 @@ bool is_table_function_whitelisted(std::string_view const function_name) {
 #ifdef HAVE_OMNIVERSE_CONNECTOR
       "tf_merge_building_polygons",
 #endif
+      "tf_metal_graph_paths",
       "tf_point_cloud_metadata",
       "tf_raster_contour_lines",
       "tf_raster_contour_polygons",

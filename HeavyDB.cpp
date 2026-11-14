@@ -530,15 +530,18 @@ int startHeavyDBServer(CommandLineOptions& prog_config_opts,
         prog_config_opts.system_parameters.ssl_key_file.c_str());
     sslSocketFactory->authenticate(false);
     sslSocketFactory->ciphers("ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
-    tcp_socket = std::make_shared<TSSLServerSocket>(
-        prog_config_opts.system_parameters.omnisci_server_port, sslSocketFactory);
+    const auto make_ssl_socket = [&](int port) {
+      return prog_config_opts.listen_address.empty()
+                 ? std::make_shared<TSSLServerSocket>(port, sslSocketFactory)
+                 : std::make_shared<TSSLServerSocket>(
+                       prog_config_opts.listen_address, port, sslSocketFactory);
+    };
+    tcp_socket = make_ssl_socket(prog_config_opts.system_parameters.omnisci_server_port);
     if (start_http_server) {
-      http_socket = std::make_shared<TSSLServerSocket>(prog_config_opts.http_port,
-                                                       sslSocketFactory);
+      http_socket = make_ssl_socket(prog_config_opts.http_port);
     }
     if (g_enable_http_binary_server) {
-      http_binary_socket = std::make_shared<TSSLServerSocket>(
-          prog_config_opts.http_binary_port, sslSocketFactory);
+      http_binary_socket = make_ssl_socket(prog_config_opts.http_binary_port);
     }
     LOG(INFO) << " HeavyDB server using encrypted connection. Cert file ["
               << prog_config_opts.system_parameters.ssl_cert_file << "], key file ["
@@ -547,14 +550,17 @@ int startHeavyDBServer(CommandLineOptions& prog_config_opts,
   } else {
     // Non-SSL port setup.
     LOG(INFO) << " HeavyDB server using unencrypted connection";
-    tcp_socket = std::make_shared<TServerSocket>(
-        prog_config_opts.system_parameters.omnisci_server_port);
+    const auto make_socket = [&](int port) {
+      return prog_config_opts.listen_address.empty()
+                 ? std::make_shared<TServerSocket>(port)
+                 : std::make_shared<TServerSocket>(prog_config_opts.listen_address, port);
+    };
+    tcp_socket = make_socket(prog_config_opts.system_parameters.omnisci_server_port);
     if (start_http_server) {
-      http_socket = std::make_shared<TServerSocket>(prog_config_opts.http_port);
+      http_socket = make_socket(prog_config_opts.http_port);
     }
     if (g_enable_http_binary_server) {
-      http_binary_socket =
-          std::make_shared<TServerSocket>(prog_config_opts.http_binary_port);
+      http_binary_socket = make_socket(prog_config_opts.http_binary_port);
     }
   }
 

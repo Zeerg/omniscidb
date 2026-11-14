@@ -255,6 +255,9 @@ public class CalciteServerHandler implements CalciteServer.Iface {
     } catch (Throwable ex) {
       HEAVYDBLOGGER.error(ex.getClass().toString());
       String msg = ex.getMessage();
+      if (msg == null || msg.isEmpty()) {
+        msg = "SQL planning failed: " + ex.getClass().getSimpleName();
+      }
       HEAVYDBLOGGER.error(msg, ex);
       throw new InvalidParseRequest(-4, msg);
     } finally {

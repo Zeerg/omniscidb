@@ -302,6 +302,10 @@ if(ENABLE_SYSTEM_TFS)
   endif()
 endif()
 
+if(ENABLE_METAL)
+  list(APPEND TABLE_FUNCTION_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/Metal/MetalGraphTableFunctions.h)
+endif()
+
 find_package(Python REQUIRED)
 
 execute_process(
@@ -340,6 +344,11 @@ set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_CLEAN_FILES SOURCE
 
 if(ENABLE_CUDA)
   list(APPEND CUDA_TABLE_FUNCTION_FILES ${GENERATED_TF_GPU_FILES})
+endif()
+
+if(ENABLE_METAL)
+  add_subdirectory(Metal)
+  list(APPEND query_engine_source_files Metal/MetalExecutor.cpp Metal/MetalGraphTableFunctions.cpp)
 endif()
 
 add_library(QueryEngine
@@ -400,7 +409,7 @@ add_custom_command(
   DEPENDS ExtensionFunctions.hpp ExtensionFunctionsGeo.hpp ExtensionFunctionsArray.hpp ExtensionFunctionsText.hpp ExtensionFunctionsTesting.hpp ExtensionFunctionsArrayTesting.hpp ExtensionFunctionsTextTesting.hpp ExtensionFunctionsH3.hpp
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/ExtensionFunctions.ast.raw
   COMMAND ${llvm_clangpp_cmd}
-  ARGS -DNO_BOOST -std=c++${CMAKE_CXX_STANDARD} -fsyntax-only -Xclang -ast-dump -fno-diagnostics-color -Wno-return-type-c-linkage
+  ARGS -DNO_BOOST -std=c++${CMAKE_CXX_STANDARD} ${CLANG_SDK_INC} -fsyntax-only -Xclang -ast-dump -fno-diagnostics-color -Wno-return-type-c-linkage
   -I ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctions.hpp > ${CMAKE_CURRENT_BINARY_DIR}/ExtensionFunctions.ast.raw)
 
 add_custom_command(
@@ -471,6 +480,9 @@ endif()
 
 target_include_directories(QueryEngine PRIVATE ${QUERY_ENGINE_INCLUDES})
 target_link_libraries(QueryEngine ${QUERY_ENGINE_LIBS})
+if(ENABLE_METAL)
+  target_link_libraries(QueryEngine HeavyDBMetal)
+endif()
 
 add_custom_command(
   DEPENDS cuda_mapd_rt.cu JoinHashTable/Runtime/JoinHashTableQueryRuntime.cpp GpuInitGroups.cu GroupByRuntime.cpp TopKRuntime.cpp DateTruncate.cpp DateAdd.cpp ExtractFromTime.cpp GeoOps.cpp StringFunctions.cpp RegexpFunctions.cpp ${CMAKE_SOURCE_DIR}/Utils/ChunkIter.cpp ${CMAKE_SOURCE_DIR}/Utils/StringLike.cpp ${CMAKE_SOURCE_DIR}/Utils/Regexp.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctions.hpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctionsGeo.hpp ${CMAKE_CURRENT_SOURCE_DIR}/ExtensionFunctionsTesting.hpp

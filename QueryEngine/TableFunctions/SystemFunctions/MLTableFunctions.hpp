@@ -2033,7 +2033,7 @@ NEVER_INLINE HOST int32_t r2_score_impl(TableFunctionManager& mgr,
   const auto labels_mean = get_column_mean(input_labels);
   const size_t max_thread_count = std::thread::hardware_concurrency();
   const size_t max_inputs_per_thread = 20000;
-  const size_t num_threads = std::min(
+  const size_t num_threads = std::min<size_t>(
       max_thread_count, ((num_rows + max_inputs_per_thread - 1) / max_inputs_per_thread));
 
   std::vector<double> local_sum_squared_regressions(num_threads, 0.0);

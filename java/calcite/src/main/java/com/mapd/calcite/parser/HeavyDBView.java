@@ -20,18 +20,12 @@ import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-
 import ai.heavy.thrift.server.TTableDetails;
 
 public class HeavyDBView extends HeavyDBTable implements TranslatableTable {
-  final static Logger HEAVYDBLOGGER = LoggerFactory.getLogger(HeavyDBView.class);
   private final String viewSql;
   private volatile SqlIdentifierCapturer accessObjects;
-  private volatile RelRoot viewRelRoot;
+  private volatile RelDataType viewRowType;
   private volatile boolean initialized = false;
   private final Object initLock = new Object();
 
@@ -64,14 +58,27 @@ public class HeavyDBView extends HeavyDBTable implements TranslatableTable {
 
   @Override
   public RelNode toRel(RelOptTable.ToRelContext context, RelOptTable relOptTable) {
-    ensureInitialized();
-    return viewRelRoot.rel;
+    // Relational plans contain mutable metadata caches. Do not share them across queries.
+    return planView().rel;
   }
 
   @Override
   public RelDataType getRowType(RelDataTypeFactory rdtf) {
     ensureInitialized();
-    return viewRelRoot.validatedRowType;
+    return rdtf.copyType(viewRowType);
+  }
+
+  private RelRoot planView() {
+    HeavyDBParser parser = CURRENT_PARSER.get();
+    if (parser == null) {
+      throw new IllegalStateException(
+              "HeavyDBView planning requires a parser context.");
+    }
+    try {
+      return parser.queryToRelNode(viewSql, new HeavyDBParserOptions());
+    } catch (SqlParseException | ValidationException | RelConversionException ex) {
+      throw new IllegalArgumentException("Failed to plan view: " + viewSql, ex);
+    }
   }
 
   private void ensureInitialized() {
@@ -84,25 +91,15 @@ public class HeavyDBView extends HeavyDBTable implements TranslatableTable {
         return;
       }
 
-      HeavyDBParser parser = CURRENT_PARSER.get();
-      if (parser == null) {
-        throw new IllegalStateException(
-                "HeavyDBView initialization requires a parser context.");
-      }
-
       try {
+        RelRoot view = planView();
         HeavyDBParserOptions parserOptions = new HeavyDBParserOptions();
-        viewRelRoot = parser.queryToRelNode(viewSql, parserOptions);
+        viewRowType = view.validatedRowType;
         accessObjects =
-                parser.captureIdentifiers(viewSql, parserOptions.isLegacySyntax());
-      } catch (SqlParseException e) {
-        HEAVYDBLOGGER.error("error parsing view SQL: " + viewSql, e);
-      } catch (ValidationException ex) {
-        HEAVYDBLOGGER.error("error validating view SQL: " + viewSql, ex);
-      } catch (RelConversionException ex) {
-        HEAVYDBLOGGER.error("error doing Rel Conversion view SQL: " + viewSql, ex);
-      } finally {
+                CURRENT_PARSER.get().captureIdentifiers(viewSql, parserOptions.isLegacySyntax());
         initialized = true;
+      } catch (SqlParseException ex) {
+        throw new IllegalArgumentException("Failed to read view identifiers: " + viewSql, ex);
       }
     }
   }

@@ -15,7 +15,7 @@ NEVER_INLINE HOST ColumnStats<T> get_column_stats(
   // const int64_t num_rows = col.size();
   const size_t max_thread_count = std::thread::hardware_concurrency();
   const size_t max_inputs_per_thread = 20000;
-  const size_t num_threads = std::min(
+  const size_t num_threads = std::min<size_t>(
       max_thread_count, ((num_rows + max_inputs_per_thread - 1) / max_inputs_per_thread));
 
   std::vector<T> local_col_mins(num_threads, std::numeric_limits<T>::max());

@@ -128,6 +128,7 @@ struct Iterator {
     this_.v1_.ptr_ += i;
     return *this;
   }
+  DEVICE Iterator& operator-=(int i) { return operator+=(-i); }
   DEVICE Iterator& operator--() {
     --this_.v0_.ptr_;
     --this_.v1_.ptr_;

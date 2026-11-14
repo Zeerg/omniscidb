@@ -520,7 +520,7 @@ NullableStrType Overlay::operator()(const std::string& base_str) const {
   std::string replaced_str = base_str.substr(0, capped_start);
   replaced_str += insert_str_;
   const size_t remainder_start =
-      std::min(wrapped_start + replacement_length_, size_t(str_len));
+      std::min<size_t>(wrapped_start + replacement_length_, size_t(str_len));
   const size_t remainder_length = static_cast<size_t>(str_len) - remainder_start;
   replaced_str += base_str.substr(remainder_start, remainder_length);
   return replaced_str;

@@ -153,12 +153,12 @@ std::vector<std::string> get_ome_tiff_band_names(
   // </Image>
   // ...
 
-  using Document = xercesc_3_2::DOMDocument;
-  using Element = xercesc_3_2::DOMElement;
-  using String = xercesc_3_2::XMLString;
-  using Utils = xercesc_3_2::XMLPlatformUtils;
-  using Parser = xercesc_3_2::XercesDOMParser;
-  using Source = xercesc_3_2::MemBufInputSource;
+  using Document = xercesc::DOMDocument;
+  using Element = xercesc::DOMElement;
+  using String = xercesc::XMLString;
+  using Utils = xercesc::XMLPlatformUtils;
+  using Parser = xercesc::XercesDOMParser;
+  using Source = xercesc::MemBufInputSource;
 
   Utils::Initialize();
 

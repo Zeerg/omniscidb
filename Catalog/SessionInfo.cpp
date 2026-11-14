@@ -32,7 +32,7 @@ bool SessionInfo::checkDBAccessPrivileges(const DBObjectType& permissionType,
 std::string SessionInfo::public_session_id() const {
   const time_t start_time = get_start_time();
   struct tm st;
-#ifdef __linux__
+#ifndef _WIN32
   localtime_r(&start_time, &st);
 #else
   localtime_s(&st, &start_time);

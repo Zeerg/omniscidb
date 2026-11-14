@@ -1,0 +1,109 @@
+--- a/src/mixins/binning-mixin.js
++++ b/src/mixins/binning-mixin.js
+@@ -77,9 +77,11 @@
+   }
+ 
+   chart._binBrushExtent = (extent0, isRangeChart) => {
+-    const bin_bounds = chart.group().binParams()[0]
+-      ? chart.group().binParams()[0].binBounds
+-      : null
++    const binParams = chart.group().binParams()[0]
++    if (!binParams) {
++      return extent0
++    }
++    const bin_bounds = binParams.binBounds
+ 
+     const chartBounds = isRangeChart
+       ? chart.rangeChart().extendBrush()
+@@ -89,7 +91,7 @@
+       return extent0
+     }
+ 
+-    const timeInterval = chart.group().binParams()[0].timeBin
++    const timeInterval = binParams.timeBin
+ 
+     const extent1 = extent0.map(date =>
+       roundTimeBin(date, timeInterval, "round")
+--- a/src/mixins/coordinate-grid-mixin.js
++++ b/src/mixins/coordinate-grid-mixin.js
+@@ -606,11 +606,7 @@
+           bindRangeInputEvents(this)
+         })
+ 
+-        if (
+-          _chart.group().binParams()[0] && _chart.group().binParams()[0].timeBin
+-        ) {
+-          _chart.updateRangeInput()
+-        }
++        _chart.updateRangeInput()
+ 
+         _chart
+           .root()
+@@ -1674,17 +1670,23 @@
+     return _chart
+   }
+ 
++  function currentBinSeconds () {
++    const binParams = _chart.group().binParams()[0]
++    const option = binParams && _chart.binInputOptions().find(d => d.val === binParams.timeBin)
++    return option ? option.numSeconds : 0
++  }
++
+   /* istanbul ignore next */
+   _chart.updateRangeInput = function () {
+     const dateFormat = d3.time.format.utc("%b %d, %Y")
+     const timeFormat = d3.time.format.utc("%I:%M%p")
+ 
+-    const extent = _chart.filter() || _chart.x().domain()
+     const rangeDisplay = _chart.root().selectAll(".range-display")
+-    const binNumSecs = _chart
+-      .binInputOptions()
+-      .filter(d => _chart.group().binParams()[0].timeBin === d.val)[0]
+-      .numSeconds
++    if (rangeDisplay.empty()) {
++      return
++    }
++    const extent = _chart.filter() || _chart.x().domain()
++    const binNumSecs = currentBinSeconds()
+ 
+     rangeDisplay
+       .select(".range-start-day")
+@@ -1711,8 +1713,6 @@
+ 
+   /* istanbul ignore next */
+   function rangeInputOnFocus () {
+-    this.select()
+-
+     const dateInputFormat = d3.time.format.utc("%m-%d-%Y")
+     const timeInputFormat = d3.time.format.utc("%I:%M%p")
+     const currentInput = d3.select(this)
+@@ -1724,6 +1724,7 @@
+       "value",
+       currentInput.classed("range-day") ? dateInputFormat(extent[index]) : timeInputFormat(extent[index])
+     )
++    this.select()
+   }
+ 
+   /* istanbul ignore next */
+@@ -1735,10 +1736,7 @@
+ 
+     const currentExtent = _chart.filter() || _chart.x().domain()
+ 
+-    const binNumSecs = _chart
+-      .binInputOptions()
+-      .filter(d => _chart.group().binParams()[0].timeBin === d.val)[0]
+-      .numSeconds
++    const binNumSecs = currentBinSeconds()
+ 
+     const inputFormat = binNumSecs > 3600 ? d3.time.format.utc("%m-%d-%Y") : currentInput.attr("class").indexOf("day") >= 0 ? d3.time.format.utc("%m-%d-%Y %I:%M%p") : d3.time.format.utc("%b %d, %Y %I:%M%p")
+ 
+--- a/src/mixins/lock-axis-mixin.js
++++ b/src/mixins/lock-axis-mixin.js
+@@ -360,7 +360,6 @@
+ 
+     axisMax
+       .append("input")
+-      .attr("pattern", "[0-9-]")
+       .attr("value", formatVal(minMax[1]))
+       .on("focus", function() {
+         this.select()

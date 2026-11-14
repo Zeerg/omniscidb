@@ -94,6 +94,12 @@ using TableDefFuncPtr = boost::function<void(TableDescriptor&,
                                              const std::list<ColumnDescriptor>& columns)>;
 
 namespace Parser {
+
+#ifdef HAVE_BOOST_1_86
+namespace bp = boost::process::v1;
+#else
+namespace bp = boost::process;
+#endif
 bool check_session_interrupted(const QuerySessionId& query_session, Executor* executor) {
   // we call this function with unitary executor but is okay since
   // we know the exact session info from a global session map object
@@ -7128,7 +7134,7 @@ DumpRestoreTableStmtBase::DumpRestoreTableStmtBase(const rapidjson::Value& paylo
   }
 
   for (const auto& program : {"tar", "rm", "mkdir", "mv", "cat"}) {
-    if (boost::process::search_path(program).empty()) {
+    if (bp::search_path(program).empty()) {
       throw std::runtime_error{"Required program \"" + std::string{program} +
                                "\" was not found."};
     }
@@ -7138,11 +7144,11 @@ DumpRestoreTableStmtBase::DumpRestoreTableStmtBase(const rapidjson::Value& paylo
 // select default compression type based upon available executables
 DumpRestoreTableStmtBase::CompressionType DumpRestoreTableStmtBase::defaultCompression(
     const bool is_restore) {
-  if (boost::process::search_path(is_restore ? Compress::sUNGZIP : Compress::sGZIP)
+  if (bp::search_path(is_restore ? Compress::sUNGZIP : Compress::sGZIP)
           .string()
           .size()) {
     return CompressionType::kGZIP;
-  } else if (boost::process::search_path(is_restore ? Compress::sUNLZ4 : Compress::sLZ4)
+  } else if (bp::search_path(is_restore ? Compress::sUNLZ4 : Compress::sLZ4)
                  .string()
                  .size()) {
     return CompressionType::kLZ4;
@@ -7159,7 +7165,7 @@ DumpRestoreTableStmtBase::CompressionType DumpRestoreTableStmtBase::validateComp
   // verify correct compression executable is available
   if (boost::iequals(compression, Compress::sGZIP)) {
     const auto prog_name = is_restore ? Compress::sUNGZIP : Compress::sGZIP;
-    const auto prog_path = boost::process::search_path(prog_name);
+    const auto prog_path = bp::search_path(prog_name);
     if (prog_path.string().empty()) {
       throw std::runtime_error("Compression program " + prog_name + " is not found.");
     }
@@ -7167,7 +7173,7 @@ DumpRestoreTableStmtBase::CompressionType DumpRestoreTableStmtBase::validateComp
 
   } else if (boost::iequals(compression, Compress::sLZ4)) {
     const auto prog_name = is_restore ? Compress::sUNLZ4 : Compress::sLZ4;
-    const auto prog_path = boost::process::search_path(prog_name);
+    const auto prog_path = bp::search_path(prog_name);
     if (prog_path.string().empty()) {
       throw std::runtime_error("Compression program " + prog_name + " is not found.");
     }

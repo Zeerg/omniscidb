@@ -1,0 +1,82 @@
+diff --git a/src/components/selector-container/selector-container.js b/src/components/selector-container/selector-container.js
+index ef5f8fd..f292609 100644
+--- a/src/components/selector-container/selector-container.js
++++ b/src/components/selector-container/selector-container.js
+@@ -70,8 +70,8 @@ export const withStateContainer = compose(
+     onOpenChange: (props) => (open) => {
+       props.setIsDropdownOpen(() => open)
+     },
+-    startEditingSelector: (props) => () => {
+-      if (props.dataSource) {
++    startEditingSelector: (props) => (dataSource = props.dataSource) => {
++      if (dataSource) {
+         props.setEditMode(() => true)
+       }
+     },
+@@ -275,7 +275,7 @@ export function SelectorPillContent({ Popover, ...props }) {
+             inactive: !props.dataSource || props.selector.inactive
+           })}
+           id={`${props.type}-add-${props.chartId || 0}`}
+-          onClick={props.startEditingSelector}
++          onClick={() => props.startEditingSelector(props.dataSource)}
+         >
+           {`+ add ${props.type}`}
+         </button>
+diff --git a/src/components/selector-container/selector-container.unit.test.js b/src/components/selector-container/selector-container.unit.test.js
+index 3254175..e723261 100644
+--- a/src/components/selector-container/selector-container.unit.test.js
++++ b/src/components/selector-container/selector-container.unit.test.js
+@@ -119,6 +119,10 @@ describe("Selector Container Component", () => {
+           invokeHandler("startEditingSelector")
+           expect(getChildStateProps().editMode).toEqual(false)
+         })
++        it("opens with the current data source", () => {
++          invokeHandler("startEditingSelector", "metal_backend_validation")
++          expect(getChildStateProps().editMode).toEqual(true)
++        })
+       })
+       describe("onKeyDown", () => {
+         it("should stop editing selector when Enter is pressed", () => {
+diff --git a/src/components/selector-pill/selector-pill-parent.js b/src/components/selector-pill/selector-pill-parent.js
+index 3df8c79..c307578 100644
+--- a/src/components/selector-pill/selector-pill-parent.js
++++ b/src/components/selector-pill/selector-pill-parent.js
+@@ -155,7 +155,7 @@ export function mergeProps(props) {
+       if (props.selector.custom) {
+         props.editParameterizedCustomSQLOption(props.index, props.selector)
+       } else {
+-        props.openSelectorPopover()
++        props.openSelectorPopover(props.dataSource)
+       }
+     },
+     handleAggClick() {
+@@ -163,7 +163,7 @@ export function mergeProps(props) {
+         return
+       }
+ 
+-      props.openSelectorPopover()
++      props.openSelectorPopover(props.dataSource)
+     },
+     onRemoveClick() {
+       props.removeSelector(props.index, props.type)
+diff --git a/src/components/selector-pill/selector-pill-parent.unit.test.js b/src/components/selector-pill/selector-pill-parent.unit.test.js
+index c5e9e1e..3e44e29 100644
+--- a/src/components/selector-pill/selector-pill-parent.unit.test.js
++++ b/src/components/selector-pill/selector-pill-parent.unit.test.js
+@@ -55,6 +55,7 @@ describe("SelectorPill Parent", () => {
+         chart: { type: "pie" },
+         index: 0,
+         selectorType: "measures",
++        dataSource: "metal_backend_validation",
+         inactive: true,
+         openSelectorPopover: jest.fn(),
+         selector: { timeBin: "" }
+@@ -70,7 +71,7 @@ describe("SelectorPill Parent", () => {
+         mergeProps(
+           Object.assign({}, props, { inactive: false })
+         ).handleSelectorClick()
+-        expect(props.openSelectorPopover).toHaveBeenCalled()
++        expect(props.openSelectorPopover).toHaveBeenCalledWith("metal_backend_validation")
+       })
+     })
+   })

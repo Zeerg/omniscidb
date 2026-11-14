@@ -30,6 +30,7 @@
 #include <utility>
 #include <vector>
 
+#include "AuthMetadata.h"
 #include "Grantee.h"
 #ifdef HAVE_LDAP
 #include "LdapServer.h"

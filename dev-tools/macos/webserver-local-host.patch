@@ -1,0 +1,37 @@
+diff --git a/internal/config/config.go b/internal/config/config.go
+index fffadd8..e66fa6b 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -13,6 +13,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"io"
++	"net"
+ 	"net/http"
+ 	"net/url"
+ 	"os"
+@@ -311,6 +312,7 @@ func init() {
+ 	pflag.Bool("enable-cert-verification", true, "Enable TLS cert verification")
+ 	pflag.Int("http-to-https-redirect-port", constants.DefaultRedirectPort, "Frontend server port for HTTP redirect, when HTTPS enabled")
+ 	pflag.IntP("port", "p", constants.DefaultPort, "Frontend server port")
++	pflag.String("host", "", "Bind the web server to this host. Empty means all interfaces")
+ 	pflag.String("secure-acao-uri", "", "URI to send as Access-Control-Allow-Origin header value [Note: Will default to '*' if --development enabled]")
+ 
+ 	// Flags - Internal
+@@ -420,6 +422,7 @@ func init() {
+ 	viper.BindPFlag("web.enable-cert-verification", pflag.CommandLine.Lookup("enable-cert-verification"))
+ 	viper.BindPFlag("web.http-to-https-redirect-port", pflag.CommandLine.Lookup("http-to-https-redirect-port"))
+ 	viper.BindPFlag("web.port", pflag.CommandLine.Lookup("port"))
++	viper.BindPFlag("web.host", pflag.CommandLine.Lookup("host"))
+ 	viper.BindPFlag("web.min-tls-version", pflag.CommandLine.Lookup("min-tls-version"))
+ 	viper.BindPFlag("web.max-tls-version", pflag.CommandLine.Lookup("max-tls-version"))
+ 	viper.BindPFlag("web.tls-cipher-suites", pflag.CommandLine.Lookup("tls-cipher-suites"))
+@@ -541,7 +544,7 @@ func init() {
+ 
+ 	HTTP.HTTPSRedirectPort = viper.GetInt("web.http-to-https-redirect-port")
+ 	HTTP.Port = viper.GetInt("web.port")
+-	HTTP.Addr = ":" + strconv.Itoa(HTTP.Port)
++	HTTP.Addr = net.JoinHostPort(viper.GetString("web.host"), strconv.Itoa(HTTP.Port))
+ 	HTTP.ConnTimeout = viper.GetDuration("web.timeout")
+ 
+ 	tlsCipherSuites := getTLSCipherSuites()

@@ -48,7 +48,7 @@ void throw_decryption_exception(const std::string& error_log_prefix) {
 bool is_expired_cert(const X509* x509) {
   bool is_expired{false};
   int days, seconds;
-  if (ASN1_TIME_diff(&days, &seconds, NULL, X509_GET_NOT_AFTER(x509)) == 1) {
+  if (ASN1_TIME_diff(&days, &seconds, NULL, X509_get0_notAfter(x509)) == 1) {
     is_expired = (days < 0 || seconds < 0);
   }
   return is_expired;

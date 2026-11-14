@@ -5,13 +5,23 @@
 
 #include "ImportExport/QueryExporterCSV.h"
 
+#ifdef HAVE_BOOST_1_86
+#include <boost/process/v1.hpp>
+#else
 #include <boost/process.hpp>
+#endif
 #include <boost/variant/get.hpp>
 
 #include "QueryEngine/ResultSet.h"
 #include "Shared/misc.h"
 
 namespace import_export {
+
+#ifdef HAVE_BOOST_1_86
+namespace bp = boost::process::v1;
+#else
+namespace bp = boost::process;
+#endif
 
 QueryExporterCSV::QueryExporterCSV()
     : QueryExporter(FileType::kCSV), file_compression_{FileCompression::kNone} {}
@@ -31,7 +41,7 @@ void QueryExporterCSV::beginExport(const std::string& file_path,
       "", "gzip", "zip"};
   auto const compression_tool{compression_tools[static_cast<int>(file_compression)]};
   if (file_compression != FileCompression::kNone &&
-      boost::process::search_path(compression_tool).string().empty()) {
+      bp::search_path(compression_tool).string().empty()) {
     throw std::runtime_error("QueryExporterCSV: " + std::string(compression_tool) +
                              " executable not found, cannot export compressed file");
   }
@@ -293,10 +303,10 @@ void QueryExporterCSV::endExport() {
         boost::filesystem::path(file_path_).parent_path().string());
     auto const local_csv_file_name =
         boost::filesystem::path(file_path_).filename().string();
-    boost::process::system("zip " + local_zip_file_path + " " + local_csv_file_name,
-                           boost::process::start_dir(start_dir),
-                           boost::process::std_out > boost::process::null,
-                           boost::process::std_err > boost::process::null);
+    bp::system("zip " + local_zip_file_path + " " + local_csv_file_name,
+               bp::start_dir(start_dir),
+               bp::std_out > bp::null,
+               bp::std_err > bp::null);
     // check compressed file exists and is non-zero length
     if (!file_is_good(zip_file_path, true)) {
       throw std::runtime_error(
@@ -308,9 +318,7 @@ void QueryExporterCSV::endExport() {
   } else if (file_compression_ == FileCompression::kGZip) {
     // compress with gzip, removes original file
     auto const gzip_file_path = file_path_ + ".gz";
-    boost::process::system("gzip " + file_path_,
-                           boost::process::std_out > boost::process::null,
-                           boost::process::std_err > boost::process::null);
+    bp::system("gzip " + file_path_, bp::std_out > bp::null, bp::std_err > bp::null);
     // check compressed file exists and is non-zero length
     if (!file_is_good(gzip_file_path, true)) {
       throw std::runtime_error(

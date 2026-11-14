@@ -5,6 +5,10 @@
 
 #include "QueryEngine/Execute.h"
 
+#ifdef HAVE_METAL
+#include "QueryEngine/Metal/MetalExecutor.h"
+#endif
+
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
@@ -2209,6 +2213,15 @@ ResultSetPtr Executor::executeWorkUnitImpl(
   INJECT_TIMER(Exec_executeWorkUnit);
   const auto [ra_exe_unit, deleted_cols_map] = addDeletedColumn(ra_exe_unit_in, co);
   CHECK(!query_infos.empty());
+#ifdef HAVE_METAL
+  if (!eo.just_explain && !eo.just_validate && !render_info &&
+      eo.executor_type == ExecutorType::Native) {
+    if (auto result = tryExecuteMetal(
+            this, ra_exe_unit, query_infos, column_cache, co.filter_on_deleted_column)) {
+      return result;
+    }
+  }
+#endif
   if (!max_groups_buffer_entry_guess) {
     // The query has failed the first execution attempt because of running out
     // of group by slots. Make the conservative choice: allocate fragment size
